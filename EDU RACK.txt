@@ -1,0 +1,288 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX_SUBJECTS 5
+
+
+struct Student {
+    int id;
+    char name[50];
+    char class_name[20]; 
+    float marks[MAX_SUBJECTS];
+    float total;
+    float average;
+    struct Student* next; 
+};
+
+
+struct Student* head = NULL;
+
+
+void addStudent();
+void calculateResults(struct Student* s);
+void mergeSort(struct Student** headRef);
+struct Student* merge(struct Student* a, struct Student* b);
+void frontBackSplit(struct Student* source, struct Student** frontRef, struct Student** backRef);
+void displayRankList();
+void searchStudentByID(int id);
+void searchStudentByName(const char *name); 
+void displayTopper(); 
+int strncmpi(const char *s1, const char *s2);
+
+
+int main() {
+    int choice, id;
+    char name_to_search[50];
+
+    do {
+        printf("\n===== Academic Ranking (Linked List with Merge Sort) =====\n");
+        printf("1. Add Student\n");
+        printf("2. Display Student Ranks by Total Marks\n"); 
+        printf("3. Display Topper (Highest Total Marks)\n"); 
+        printf("4. Search Student by ID\n");
+        printf("5. Search Student by Name\n");
+        printf("6. Exit\n");
+        printf("Enter your choice: ");
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n');
+            choice = 0;
+        }
+
+        switch(choice) {
+            case 1:
+                addStudent();
+                break;
+            case 2:
+                displayRankList();
+                break;
+            case 3: 
+                displayTopper();
+                break;
+            case 4:
+                printf("Enter Student ID to search: ");
+                scanf("%d", &id);
+                searchStudentByID(id);
+                break;
+            case 5:
+                printf("Enter Student Name to search: ");
+                scanf(" %[^\n]", name_to_search);
+                searchStudentByName(name_to_search);
+                break;
+            case 6:
+                printf("Exiting program...\n");
+                break;
+            default:
+                printf("Invalid choice! Try again.\n");
+        }
+    } while(choice != 6); 
+
+    return 0;
+}
+
+
+void addStudent() {
+    struct Student* newStudent = (struct Student*)malloc(sizeof(struct Student));
+    if (newStudent == NULL) {
+        printf("Memory allocation failed!\n");
+        return;
+    }
+
+    printf("Enter Student ID: ");
+    scanf("%d", &newStudent->id);
+    printf("Enter Student Name: ");
+    scanf(" %[^\n]", newStudent->name);
+    
+    printf("Enter Student Class (e.g., Class 1, Class 10): ");
+    scanf(" %[^\n]", newStudent->class_name);
+
+    for (int i = 0; i < MAX_SUBJECTS; i++) {
+        printf("Enter marks for Subject %d: ", i + 1);
+        scanf("%f", &newStudent->marks[i]);
+    }
+    calculateResults(newStudent);
+
+    newStudent->next = head;
+    head = newStudent;
+
+    printf("Student added successfully!\n");
+}
+
+
+void calculateResults(struct Student* s) {
+    if (s == NULL) return;
+    s->total = 0;
+    for (int i = 0; i < MAX_SUBJECTS; i++) {
+        s->total += s->marks[i];
+    }
+    s->average = s->total / MAX_SUBJECTS;
+}
+
+
+void mergeSort(struct Student** headRef) {
+    struct Student* h = *headRef;
+    struct Student* a;
+    struct Student* b;
+    if ((h == NULL) || (h->next == NULL)) return;
+    frontBackSplit(h, &a, &b);
+    mergeSort(&a);
+    mergeSort(&b);
+    *headRef = merge(a, b);
+}
+
+struct Student* merge(struct Student* a, struct Student* b) {
+    struct Student* result = NULL;
+    if (a == NULL) return b;
+    if (b == NULL) return a;
+    if (a->total >= b->total) { 
+        result = a;
+        result->next = merge(a->next, b);
+    } else {
+        result = b;
+        result->next = merge(a, b->next);
+    }
+    return result;
+}
+
+void frontBackSplit(struct Student* source, struct Student** frontRef, struct Student** backRef) {
+    struct Student* fast;
+    struct Student* slow;
+    slow = source;
+    fast = source->next;
+    while (fast != NULL) {
+        fast = fast->next;
+        if (fast != NULL) {
+            slow = slow->next;
+            fast = fast->next;
+        }
+    }
+    *frontRef = source;
+    *backRef = slow->next;
+    slow->next = NULL; 
+}
+
+
+
+void displayTopper() {
+    if (head == NULL) {
+        printf("\nNo student data available to determine the topper!\n");
+        return;
+    }
+
+    
+    mergeSort(&head); 
+
+    struct Student* topper = head;
+
+    printf("\n\n *The Class Topper* \n");
+    printf("--------------------------------------\n");
+    printf("Name: %s\n", topper->name);
+    printf("Class: %s\n", topper->class_name);
+    printf("ID: %d\n", topper->id);
+    printf("Total Marks: %.2f\n", topper->total);
+    printf("Average: %.2f\n", topper->average);
+
+    
+    struct Student* current = topper->next;
+    int tie = 0;
+    while (current != NULL && current->total == topper->total) {
+        if (!tie) {
+            printf("\n(There is a tie! Other students with %.2f marks:)\n", topper->total);
+            tie = 1;
+        }
+        printf(" - %s (ID: %d)\n", current->name, current->id);
+        current = current->next;
+    }
+    printf("--------------------------------------\n");
+}
+
+
+
+void displayRankList() {
+    if (head == NULL) {
+        printf("No student data available!\n");
+        return;
+    }
+
+    mergeSort(&head); 
+
+    printf("\n\nAcademic Rank List (Sorted by Total Marks)\n");
+    
+    
+    printf("%-5s %-10s %-15s %-10s ", "Rank", "ID", "Name", "Class");
+    for(int i = 0; i < MAX_SUBJECTS; i++) {
+        printf("Sub%d  ", i + 1); 
+    }
+    printf("%-10s %-10s\n", "Total", "Average");
+    printf("--------------------------------------------------------------------------------------------------------------\n");
+
+    struct Student* current = head;
+    int rank = 1;
+    while (current != NULL) {
+        printf("%-5d %-10d %-15s %-10s ", rank++, current->id, current->name, current->class_name);
+        
+        for (int j = 0; j < MAX_SUBJECTS; j++) {
+            printf("%-6.1f", current->marks[j]);
+        }
+        
+        printf("%-10.2f %-10.2f\n", current->total, current->average);
+        current = current->next;
+    }
+    printf("--------------------------------------------------------------------------------------------------------------\n");
+}
+
+\
+void searchStudentByID(int id) {
+    struct Student* current = head;
+    while (current != NULL) {
+        if (current->id == id) {
+            printf("\nStudent Found!\n");
+            printf("ID: %d\nName: %s\nClass: %s\n", current->id, current->name, current->class_name);
+            
+            for (int j = 0; j < MAX_SUBJECTS; j++) {
+                printf("Marks for Subject %d: %.2f\n", j + 1, current->marks[j]);
+            }
+            
+            printf("Total: %.2f\nAverage: %.2f\n", current->total, current->average);
+            return;
+        }
+        current = current->next;
+    }
+    printf("Student with ID %d not found!\n", id);
+}
+
+
+int strncmpi(const char *s1, const char *s2) {
+    int i = 0;
+    while (s1[i] && s2[i]) {
+        if (tolower((unsigned char)s1[i]) != tolower((unsigned char)s2[i])) {
+            return tolower((unsigned char)s1[i]) - tolower((unsigned char)s2[i]);
+        }
+        i++;
+    }
+    return tolower((unsigned char)s1[i]) - tolower((unsigned char)s2[i]);
+}
+
+
+void searchStudentByName(const char *name_to_search) {
+    struct Student* current = head;
+    int found = 0;
+
+    printf("\nSearch Results for: \"%s\"\n", name_to_search);
+    printf("-------------------------------------------------------------------\n");
+
+    while (current != NULL) {
+        if (strncmpi(current->name, name_to_search) == 0) {
+            printf("ID: %d, Name: %s, Class: %s, Total: %.2f, Average: %.2f\n",
+                   current->id, current->name, current->class_name, current->total, current->average);
+            found = 1;
+        }
+        current = current->next;
+    }
+    
+    if (!found) {
+        printf("Student with name \"%s\" not found!\n", name_to_search);
+    }
+    printf("-------------------------------------------------------------------\n");
+}
